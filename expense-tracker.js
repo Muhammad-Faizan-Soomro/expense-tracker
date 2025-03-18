@@ -95,3 +95,27 @@ const updateExpense = (id, description = "", amount = Number) => {
     console.error(`Error Updating Expense: ${error.message}`);
   }
 };
+
+const deleteExpense = (id) => {
+  try {
+    id = Number(id);
+    if (isNaN(id)) {
+      throw new Error("Invalid ID, please provide a valid numeric ID.");
+    }
+
+    const data = readFile();
+    const initialLength = data.length;
+
+    const updatedData = data.filter((expense) => expense.id != id);
+
+    if (initialLength == updatedData.length) {
+      throw new Error(`No expense found with ID = ${id}.`);
+    }
+
+    writeFile(updatedData);
+
+    console.log(`Expense deleted successfully (ID: ${id})`);
+  } catch (error) {
+    console.error(`Error Deleting Expense: ${error.message}`);
+  }
+};
