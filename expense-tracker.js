@@ -18,6 +18,16 @@ const readFile = () => {
   return data ? JSON.parse(data) : [];
 };
 
+const formatDate = (date) => {
+  return (
+    date.getFullYear() +
+    "-" +
+    String(date.getMonth() + 1).padStart(2, "0") +
+    "-" +
+    String(date.getDate()).padStart(2, "0")
+  );
+};
+
 const addExpense = (description, amount) => {
   try {
     description = description.trim();
@@ -32,7 +42,7 @@ const addExpense = (description, amount) => {
       );
     }
 
-    const now = new Date().toLocaleDateString();
+    const now = formatDate(new Date());
 
     const data = readFile();
 
@@ -131,7 +141,9 @@ const listExpense = () => {
 
     data.forEach((expense) => {
       console.log(
-        `${expense.id.toString().padEnd(3)}  ${expense.updatedAt}  ${expense.description.padEnd(12)}  $${expense.amount}`
+        `${expense.id.toString().padEnd(3)}  ${
+          expense.updatedAt
+        }  ${expense.description.padEnd(12)}  $${expense.amount}`
       );
     });
   } catch (error) {
