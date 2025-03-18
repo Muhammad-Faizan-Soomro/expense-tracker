@@ -119,3 +119,22 @@ const deleteExpense = (id) => {
     console.error(`Error Deleting Expense: ${error.message}`);
   }
 };
+
+const listExpense = () => {
+  try {
+    const data = readFile();
+
+    if (data.length == 0) throw new Error("No expense(s) available.");
+
+    console.log("ID      Date   Description    Amount");
+    console.log("────────────────────────────────────");
+
+    data.forEach((expense) => {
+      console.log(
+        `${expense.id.toString().padEnd(3)}  ${expense.updatedAt}  ${expense.description.padEnd(12)}  $${expense.amount}`
+      );
+    });
+  } catch (error) {
+    console.error(`Error Listing Expense(s): ${error.message}`);
+  }
+};
