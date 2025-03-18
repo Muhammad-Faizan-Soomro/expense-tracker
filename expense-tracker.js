@@ -51,3 +51,47 @@ const addExpense = (description, amount) => {
     console.error(`Error adding expense: ${error.message}`);
   }
 };
+
+const updateExpense = (id, description = "", amount = Number) => {
+  try {
+    id = Number(id);
+    if (isNaN(id)) {
+      throw new Error("Invalid ID, please provide a valid numeric ID.");
+    }
+
+    if (!(description || amount)) {
+      throw new Error(
+        "provide any one of description or amount or both to update the expense."
+      );
+    }
+
+    description = description.trim();
+
+    amount = Number(amount);
+    if (isNaN(amount) || amount < 0) {
+      throw new Error(
+        "Invalid amount, please provide a valid positive numeric amount."
+      );
+    }
+
+    const data = readFile();
+
+    const expenseIndex = data.findIndex((expense) => expense.id === id);
+
+    if (expenseIndex == -1) {
+      throw new Error(`No expense found with ID = ${id}.`);
+    }
+
+    data[expenseIndex].description = description
+      ? description
+      : data[expenseIndex].description;
+    data[expenseIndex].amount = amount ? amount : data[expenseIndex].amount;
+    data[expenseIndex].updatedAt = new Date().toLocaleDateString();
+
+    writeFile(data);
+
+    console.log(`Expense updated successfully (ID: ${id})`);
+  } catch (error) {
+    console.error(`Error Updating Expense: ${error.message}`);
+  }
+};
