@@ -134,7 +134,7 @@ const listExpense = () => {
   try {
     const data = readFile();
 
-    if (data.length == 0) throw new Error("No expense(s) available.");
+    if (data.length == 0) console.log("No expense(s) available.");
 
     console.log("ID      Date   Description    Amount");
     console.log("────────────────────────────────────");
@@ -148,5 +148,18 @@ const listExpense = () => {
     });
   } catch (error) {
     console.error(`Error Listing Expense(s): ${error.message}`);
+  }
+};
+
+const summary = () => {
+  try {
+    const data = readFile();
+    if (data.length == 0) console.log("Total expenses: $0");
+
+    const finalSum = data.reduce((acc, curr) => acc + curr.amount, 0);
+
+    console.log(`Total expenses: $${finalSum}`);
+  } catch (error) {
+    console.error(`Error Listing Summary: ${error.message}`);
   }
 };
