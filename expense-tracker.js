@@ -1,6 +1,20 @@
 const fs = require("fs");
 
 const EXPENSE_FILE = "./expense.json";
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
 
 const writeFile = (data) => {
   if (!Array.isArray(data)) {
@@ -159,6 +173,32 @@ const summary = () => {
     const finalSum = data.reduce((acc, curr) => acc + curr.amount, 0);
 
     console.log(`Total expenses: $${finalSum}`);
+  } catch (error) {
+    console.error(`Error Listing Summary: ${error.message}`);
+  }
+};
+
+const summaryByMonth = (month) => {
+  try {
+    month = Number(month);
+    if (isNaN(month) || month < 0 || month > MONTHS.length) {
+      throw new Error(
+        "Invalid month, please provide a valid numeric month [1-12]."
+      );
+    }
+
+    const data = readFile();
+
+    if (data.length == 0) {
+      console.log(`Total expenses for ${MONTHS[month - 1]}: $0`);
+    }
+
+    const finalSum = data
+      .filter((expense) => new Date(expense.createdAt).getMonth() + 1 === month)
+      .filter((expense) => new Date(expense.createdAt).getFullYear() === new Date().getFullYear())
+      .reduce((acc, curr) => acc + curr.amount, 0);
+
+    console.log(`Total expenses for ${MONTHS[month - 1]}: $${finalSum}`);
   } catch (error) {
     console.error(`Error Listing Summary: ${error.message}`);
   }
