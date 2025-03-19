@@ -56,7 +56,14 @@ const addExpense = (description, amount) => {
       );
     }
 
-    const now = formatDate(new Date());
+    const now = new Date();
+
+    const formattedDate =
+      now.getFullYear() +
+      "-" +
+      String(now.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(now.getDate()).padStart(2, "0");
 
     const data = readFile();
 
@@ -64,8 +71,7 @@ const addExpense = (description, amount) => {
       id: data.length === 0 ? 1 : Math.max(...data.map((data) => data.id)) + 1,
       description: description,
       amount: amount,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: formattedDate,
     };
 
     writeFile([...data, expense]);
@@ -110,7 +116,6 @@ const updateExpense = (id, description = "", amount = Number) => {
       ? description
       : data[expenseIndex].description;
     data[expenseIndex].amount = amount ? amount : data[expenseIndex].amount;
-    data[expenseIndex].updatedAt = new Date().toLocaleDateString();
 
     writeFile(data);
 
@@ -156,7 +161,7 @@ const listExpense = () => {
     data.forEach((expense) => {
       console.log(
         `${expense.id.toString().padEnd(3)}  ${
-          expense.updatedAt
+          expense.createdAt
         }  ${expense.description.padEnd(12)}  $${expense.amount}`
       );
     });
@@ -195,7 +200,10 @@ const summaryByMonth = (month) => {
 
     const finalSum = data
       .filter((expense) => new Date(expense.createdAt).getMonth() + 1 === month)
-      .filter((expense) => new Date(expense.createdAt).getFullYear() === new Date().getFullYear())
+      .filter(
+        (expense) =>
+          new Date(expense.createdAt).getFullYear() === new Date().getFullYear()
+      )
       .reduce((acc, curr) => acc + curr.amount, 0);
 
     console.log(`Total expenses for ${MONTHS[month - 1]}: $${finalSum}`);
