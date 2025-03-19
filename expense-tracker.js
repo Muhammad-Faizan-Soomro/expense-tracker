@@ -15,6 +15,7 @@ const MONTHS = [
   "November",
   "December",
 ];
+const options = {};
 
 const writeFile = (data) => {
   if (!Array.isArray(data)) {
@@ -30,6 +31,22 @@ const readFile = () => {
   }
   const data = fs.readFileSync(EXPENSE_FILE, "utf-8");
   return data ? JSON.parse(data) : [];
+};
+
+const validateArgs = (expectedLength, command) => {
+  if (process.argv.length !== expectedLength) {
+    const commands = {
+      add: "node expense-tracker.js add --description <description> --amount <amount>",
+      summary: "node expense-tracker.js summary --month <month>",
+      delete: "node expense-tracker.js delete --id <id>",
+      update:
+        "\nnode expense-tracker.js update --id <id> --description <description> OR \nnode expense-tracker.js update --id <id> --amount <amount> OR \nnode expense-tracker.js update --id <id> --description <description> --amount <amount>",
+    };
+
+    throw new Error(
+      `Invalid arguments!\nUsage: ${commands[command] || "unknown command"}`
+    );
+  }
 };
 
 const addExpense = (description, amount) => {
@@ -203,3 +220,86 @@ const summary = (month = "") => {
     console.error(`Error Listing Summary: ${error.message}`);
   }
 };
+
+const commands = {
+  add: () => {
+    validateArgs(7, "add");
+    if (!(options.description && options.amount)) {
+      console.error(
+        "Error: Invalid options, options should only be 'description' and 'amount'."
+      );
+      return;
+    }
+    addExpense(options.description, options.amount);
+  },
+  list: () => {
+    if (process.argv.length == 3) {
+      listExpense();
+      return;
+    }
+  },
+  summary: () => {
+    if (process.argv.length == 3) {
+      summary();
+      return;
+    }
+    validateArgs(5, "summary");
+    if (!options.month) {
+      console.error("Error: Invalid option, option should only be 'month'.");
+      return;
+    }
+    summary(options.month);
+  },
+  delete: () => {
+    validateArgs(5, "delete");
+    if (!options.id) {
+      console.error("Error: Invalid option, option should only be 'id'.");
+      return;
+    }
+    deleteExpense(options.id);
+  },
+  update: () => {
+    if (process.argv.length == 7) {
+      validateArgs(7, "update");
+      if (!options.id || !(options.amount || options.description)) {
+        console.error(
+          "Error: Invalid option, option should only be 'id' and ['description' or 'amount']."
+        );
+        return;
+      }
+    } else {
+      validateArgs(9, "update");
+      if (!(options.amount && options.description && options.id)) {
+        console.error(
+          "Error: Invalid options, options should only be 'id' and 'description' and 'amount'."
+        );
+        return;
+      }
+    }
+
+    updateExpense(options.id, options?.description, options?.amount);
+  },
+};
+
+try {
+  const command = process.argv[2];
+  if (!commands[command]) {
+    throw new Error(
+      `Unknown command: ${command}. Available commands: add, list, summary <month>, update, delete`
+    );
+  }
+  const args = process.argv.slice(2);
+
+  for (let i = 0; i < args.length; i++) {
+    if (args[i].startsWith("--")) {
+      const key = args[i].substring(2);
+      const value =
+        args[i + 1] && !args[i + 1].startsWith("--") ? args[i + 1] : undefined;
+      options[key] = value;
+    }
+  }
+  commands[command]();
+} catch (error) {
+  console.error(`Error: ${error.message}`);
+  process.exit(1);
+}
