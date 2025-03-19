@@ -32,16 +32,6 @@ const readFile = () => {
   return data ? JSON.parse(data) : [];
 };
 
-const formatDate = (date) => {
-  return (
-    date.getFullYear() +
-    "-" +
-    String(date.getMonth() + 1).padStart(2, "0") +
-    "-" +
-    String(date.getDate()).padStart(2, "0")
-  );
-};
-
 const addExpense = (description, amount) => {
   try {
     description = description.trim();
@@ -50,7 +40,7 @@ const addExpense = (description, amount) => {
     }
 
     amount = Number(amount);
-    if (isNaN(amount) || amount < 0) {
+    if (!amount || isNaN(amount) || amount < 0) {
       throw new Error(
         "Invalid amount, please provide a valid positive numeric amount."
       );
@@ -82,10 +72,10 @@ const addExpense = (description, amount) => {
   }
 };
 
-const updateExpense = (id, description = "", amount = Number) => {
+const updateExpense = (id, description = "", amount = "") => {
   try {
     id = Number(id);
-    if (isNaN(id)) {
+    if (!id || isNaN(id)) {
       throw new Error("Invalid ID, please provide a valid numeric ID.");
     }
 
@@ -97,11 +87,13 @@ const updateExpense = (id, description = "", amount = Number) => {
 
     description = description.trim();
 
-    amount = Number(amount);
-    if (isNaN(amount) || amount < 0) {
-      throw new Error(
-        "Invalid amount, please provide a valid positive numeric amount."
-      );
+    if (amount) {
+      amount = Number(amount);
+      if (isNaN(amount) || amount < 0) {
+        throw new Error(
+          "Invalid amount, please provide a valid positive numeric amount."
+        );
+      }
     }
 
     const data = readFile();
@@ -128,7 +120,7 @@ const updateExpense = (id, description = "", amount = Number) => {
 const deleteExpense = (id) => {
   try {
     id = Number(id);
-    if (isNaN(id)) {
+    if (!id || isNaN(id)) {
       throw new Error("Invalid ID, please provide a valid numeric ID.");
     }
 
@@ -153,7 +145,10 @@ const listExpense = () => {
   try {
     const data = readFile();
 
-    if (data.length == 0) console.log("No expense(s) available.");
+    if (data.length == 0) {
+      console.log("No expense(s) available.");
+      return;
+    }
 
     console.log("ID      Date   Description    Amount");
     console.log("────────────────────────────────────");
@@ -170,32 +165,29 @@ const listExpense = () => {
   }
 };
 
-const summary = () => {
+const summary = (month = "") => {
   try {
-    const data = readFile();
-    if (data.length == 0) console.log("Total expenses: $0");
-
-    const finalSum = data.reduce((acc, curr) => acc + curr.amount, 0);
-
-    console.log(`Total expenses: $${finalSum}`);
-  } catch (error) {
-    console.error(`Error Listing Summary: ${error.message}`);
-  }
-};
-
-const summaryByMonth = (month) => {
-  try {
-    month = Number(month);
-    if (isNaN(month) || month < 0 || month > MONTHS.length) {
-      throw new Error(
-        "Invalid month, please provide a valid numeric month [1-12]."
-      );
+    if (month) {
+      month = Number(month);
+      if (isNaN(month) || month < 0 || month > MONTHS.length) {
+        throw new Error(
+          "Invalid month, please provide a valid numeric month [1-12]."
+        );
+      }
     }
 
     const data = readFile();
-
     if (data.length == 0) {
-      console.log(`Total expenses for ${MONTHS[month - 1]}: $0`);
+      console.log(
+        `Total expenses ${month ? `for ${MONTHS[month - 1]}` : ""}: $0`
+      );
+      return;
+    }
+
+    if (!month) {
+      const finalSum = data.reduce((acc, curr) => acc + curr.amount, 0);
+      console.log(`Total expenses: $${finalSum}`);
+      return;
     }
 
     const finalSum = data
