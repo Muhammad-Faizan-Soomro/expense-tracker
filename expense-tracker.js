@@ -3,7 +3,6 @@ const { Command } = require("commander");
 const program = new Command();
 
 const EXPENSE_FILE = "./expense.json";
-const OUTPUT_FILE = "./expenses.csv";
 const MONTHS = [
   "January",
   "February",
@@ -67,18 +66,18 @@ const addExpense = (description, amount, categoryId) => {
     categoryId = Number(categoryId);
     if (!categoryId || isNaN(categoryId) || categoryId < 0) {
       throw new Error(
-        "Invalid categoryId, please provide a valid positive numeric categoryId."
+        "Invalid ID, please provide a valid positive numeric ID."
       );
     }
 
     const now = new Date();
 
     const formattedDate =
-      now.getFullYear() +
+      now.getUTCFullYear() +
       "-" +
-      String(now.getMonth() + 1).padStart(2, "0") +
+      String(now.getUTCMonth() + 1).padStart(2, "0") +
       "-" +
-      String(now.getDate()).padStart(2, "0");
+      String(now.getUTCDate()).padStart(2, "0");
 
     const { expense, category } = readFile();
 
@@ -86,7 +85,9 @@ const addExpense = (description, amount, categoryId) => {
       (category) => category.id === categoryId
     );
 
-    if (categoryIndex === -1) throw new Error("Category does not exist.");
+    if (categoryIndex === -1) {
+      throw new Error(`Category ID ${categoryId} does not exist.`);
+    }
 
     const expenseData = {
       id:
@@ -174,16 +175,16 @@ const deleteExpense = (id) => {
       throw new Error("Invalid ID, please provide a valid numeric ID.");
     }
 
-    const data = readFile();
-    const initialLength = data.length;
+    const { expense, category } = readFile();
+    const initialLength = expense.length;
 
-    const updatedData = data.filter((expense) => expense.id != id);
+    const updatedData = expense.filter((expense) => expense.id != id);
 
     if (initialLength == updatedData.length) {
       throw new Error(`No expense found with ID = ${id}.`);
     }
 
-    writeFile(updatedData);
+    writeFile({ expense: [...updatedData], category: [...category] });
 
     console.log(`Expense deleted successfully (ID: ${id})`);
   } catch (error) {
@@ -206,16 +207,16 @@ const listExpense = (type) => {
         return acc;
       }, {});
 
-      console.log("ID      Date   Description    Amount     Category");
+      console.log("ID      Date    Description    Amount     Category");
       console.log("─────────────────────────────────────────────────");
 
       expense.forEach((expense) => {
         console.log(
           `${expense.id.toString().padEnd(3)}  ${
             expense.createdAt
-          }  ${expense.description.padEnd(12)}  $${expense.amount}    ${
-            categoriesMap[expense.categoryId]
-          }`
+          }  ${expense.description.padEnd(12)}  $${String(
+            expense.amount
+          ).padEnd(6)}    ${categoriesMap[expense.categoryId]}`
         );
       });
     } else {
@@ -244,7 +245,7 @@ const summary = (month = "", categoryId = "") => {
   try {
     if (month) {
       month = Number(month);
-      if (isNaN(month) || month < 0 || month > MONTHS.length) {
+      if (isNaN(month) || month < 0 || month > 12) {
         throw new Error(
           "Invalid month, please provide a valid numeric month [1-12]."
         );
@@ -286,12 +287,14 @@ const summary = (month = "", categoryId = "") => {
     } else if (month && !categoryId) {
       const finalSum = expense
         .filter(
-          (expense) => new Date(expense.createdAt).getMonth() + 1 === month
+          (expense) =>
+            new Date(expense.createdAt + "T00:00:00Z").getUTCMonth() + 1 ===
+            month
         )
         .filter(
           (expense) =>
-            new Date(expense.createdAt).getFullYear() ===
-            new Date().getFullYear()
+            new Date(expense.createdAt + "T00:00:00Z").getUTCFullYear() ===
+            new Date().getUTCFullYear()
         )
         .reduce((acc, curr) => acc + curr.amount, 0);
 
@@ -309,12 +312,14 @@ const summary = (month = "", categoryId = "") => {
       const finalSum = expense
         .filter((expense) => expense.categoryId === categoryId)
         .filter(
-          (expense) => new Date(expense.createdAt).getMonth() + 1 === month
+          (expense) =>
+            new Date(expense.createdAt + "T00:00:00Z").getUTCMonth() + 1 ===
+            month
         )
         .filter(
           (expense) =>
-            new Date(expense.createdAt).getFullYear() ===
-            new Date().getFullYear()
+            new Date(expense.createdAt + "T00:00:00Z").getUTCFullYear() ===
+            new Date().getUTCFullYear()
         )
         .reduce((acc, curr) => acc + curr.amount, 0);
 
@@ -347,11 +352,11 @@ const createCategory = (name) => {
     const now = new Date();
 
     const formattedDate =
-      now.getFullYear() +
+      now.getUTCFullYear() +
       "-" +
-      String(now.getMonth() + 1).padStart(2, "0") +
+      String(now.getUTCMonth() + 1).padStart(2, "0") +
       "-" +
-      String(now.getDate()).padStart(2, "0");
+      String(now.getUTCDate()).padStart(2, "0");
 
     const categoryData = {
       id:
@@ -437,7 +442,7 @@ const deleteCategory = (id) => {
   }
 };
 
-const exportToCSV = () => {
+const exportToCSV = (file) => {
   try {
     const { expense, category } = readFile();
     if (expense.length === 0) {
@@ -471,8 +476,8 @@ const exportToCSV = () => {
     const csvContent = [csvHeaders.join(","), ...csvRows].join("\n");
 
     // Write to file
-    fs.writeFileSync(OUTPUT_FILE, csvContent, "utf-8");
-    console.log(`Exported ${expense.length} expenses to ${OUTPUT_FILE}`);
+    fs.writeFileSync(file, csvContent, "utf-8");
+    console.log(`Exported ${expense.length} expenses to ${file}`);
   } catch (error) {
     console.error(`Export failed: ${error.message}`);
   }
@@ -554,6 +559,9 @@ program
   .requiredOption("--id <number>", "Category ID")
   .action((options) => deleteCategory(options.id));
 
-program.command("export").action(() => exportToCSV());
+program
+  .command("export")
+  .option("--output <file>", "Output CSV file", "expenses.csv")
+  .action((options) => exportToCSV(options.output));
 
 program.parse();
