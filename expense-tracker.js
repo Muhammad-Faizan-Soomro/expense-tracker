@@ -3,6 +3,7 @@ const { Command } = require("commander");
 const program = new Command();
 
 const EXPENSE_FILE = "./expense.json";
+const OUTPUT_FILE = "./expenses.csv";
 const MONTHS = [
   "January",
   "February",
@@ -37,6 +38,16 @@ const readFile = () => {
   }
   const data = fs.readFileSync(EXPENSE_FILE, "utf-8");
   return data ? JSON.parse(data) : { expense: [], category: [] };
+};
+
+const escapeCSV = (value) => {
+  if (
+    typeof value === "string" &&
+    (value.includes(",") || value.includes('"'))
+  ) {
+    return `"${value.replace(/"/g, '""')}"`; // Escape quotes and wrap in quotes
+  }
+  return value;
 };
 
 const addExpense = (description, amount, categoryId) => {
@@ -426,6 +437,47 @@ const deleteCategory = (id) => {
   }
 };
 
+const exportToCSV = () => {
+  try {
+    const { expense, category } = readFile();
+    if (expense.length === 0) {
+      console.log("No expenses to export.");
+      return;
+    }
+
+    // Read categories (if implemented)
+    const categoriesMap = category.reduce((acc, cat) => {
+      acc[cat.id] = cat.name;
+      return acc;
+    }, {});
+
+    // CSV Headers
+    const csvHeaders = ["ID", "Date", "Description", "Amount", "Category"];
+
+    // CSV Rows
+    const csvRows = expense.map((expense) => {
+      const categoryName = categoriesMap[expense.categoryId];
+
+      return [
+        expense.id,
+        expense.createdAt,
+        escapeCSV(expense.description),
+        expense.amount,
+        escapeCSV(categoryName),
+      ].join(",");
+    });
+
+    // Combine headers and rows
+    const csvContent = [csvHeaders.join(","), ...csvRows].join("\n");
+
+    // Write to file
+    fs.writeFileSync(OUTPUT_FILE, csvContent, "utf-8");
+    console.log(`Exported ${expense.length} expenses to ${OUTPUT_FILE}`);
+  } catch (error) {
+    console.error(`Export failed: ${error.message}`);
+  }
+};
+
 program
   .command("add")
   .requiredOption("--description <string>", "Expense description")
@@ -501,5 +553,7 @@ program
   .command("delete-category")
   .requiredOption("--id <number>", "Category ID")
   .action((options) => deleteCategory(options.id));
+
+program.command("export").action(() => exportToCSV());
 
 program.parse();
