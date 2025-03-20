@@ -18,23 +18,28 @@ const MONTHS = [
   "December",
 ];
 
+function isObject(value) {
+  return Object.prototype.toString.call(value) === "[object Object]";
+}
+
 const writeFile = (data) => {
-  if (!Array.isArray(data)) {
-    throw new Error("Invalid data format: expected array");
+  if (!isObject(data)) {
+    throw new Error("Invalid data format: expected object");
   }
   fs.writeFileSync(EXPENSE_FILE, JSON.stringify(data, null, 2), "utf-8");
 };
 
 const readFile = () => {
   if (!fs.existsSync(EXPENSE_FILE)) {
-    writeFile([]);
-    return [];
+    const data = { expense: [], category: [] };
+    writeFile(data);
+    return data;
   }
   const data = fs.readFileSync(EXPENSE_FILE, "utf-8");
-  return data ? JSON.parse(data) : [];
+  return data ? JSON.parse(data) : { expense: [], category: [] };
 };
 
-const addExpense = (description, amount) => {
+const addExpense = (description, amount, categoryId) => {
   try {
     description = description.trim();
     if (!description) {
@@ -48,6 +53,13 @@ const addExpense = (description, amount) => {
       );
     }
 
+    categoryId = Number(categoryId);
+    if (!categoryId || isNaN(categoryId) || categoryId < 0) {
+      throw new Error(
+        "Invalid categoryId, please provide a valid positive numeric categoryId."
+      );
+    }
+
     const now = new Date();
 
     const formattedDate =
@@ -57,34 +69,38 @@ const addExpense = (description, amount) => {
       "-" +
       String(now.getDate()).padStart(2, "0");
 
-    const data = readFile();
+    const { expense, category } = readFile();
 
-    const expense = {
-      id: data.length === 0 ? 1 : Math.max(...data.map((data) => data.id)) + 1,
+    const categoryIndex = category.findIndex(
+      (category) => category.id === categoryId
+    );
+
+    if (categoryIndex === -1) throw new Error("Category does not exist.");
+
+    const expenseData = {
+      id:
+        expense.length === 0
+          ? 1
+          : Math.max(...expense.map((data) => data.id)) + 1,
       description: description,
       amount: amount,
+      categoryId: categoryId,
       createdAt: formattedDate,
     };
 
-    writeFile([...data, expense]);
+    writeFile({ expense: [...expense, expenseData], category: [...category] });
 
-    console.log(`Expense added successfully (ID: ${expense.id})`);
+    console.log(`Expense added successfully (ID: ${expenseData.id})`);
   } catch (error) {
     console.error(`Error adding expense: ${error.message}`);
   }
 };
 
-const updateExpense = (id, description = "", amount = "") => {
+const updateExpense = (id, description = "", amount = "", categoryId = "") => {
   try {
     id = Number(id);
     if (!id || isNaN(id)) {
       throw new Error("Invalid ID, please provide a valid numeric ID.");
-    }
-
-    if (!(description || amount)) {
-      throw new Error(
-        "provide any one of description or amount or both to update the expense."
-      );
     }
 
     description = description.trim();
@@ -98,20 +114,41 @@ const updateExpense = (id, description = "", amount = "") => {
       }
     }
 
-    const data = readFile();
+    const { expense, category } = readFile();
 
-    const expenseIndex = data.findIndex((expense) => expense.id === id);
+    if (categoryId) {
+      categoryId = Number(categoryId);
+      if (isNaN(categoryId) || categoryId < 0) {
+        throw new Error(
+          "Invalid category ID, please provide a valid numeric category ID."
+        );
+      }
+
+      const categoryIndex = category.findIndex(
+        (category) => category.id === categoryId
+      );
+
+      if (categoryIndex == -1)
+        throw new Error(`No category found with ID = ${categoryId}.`);
+    }
+
+    const expenseIndex = expense.findIndex((expense) => expense.id === id);
 
     if (expenseIndex == -1) {
       throw new Error(`No expense found with ID = ${id}.`);
     }
 
-    data[expenseIndex].description = description
+    expense[expenseIndex].description = description
       ? description
-      : data[expenseIndex].description;
-    data[expenseIndex].amount = amount ? amount : data[expenseIndex].amount;
+      : expense[expenseIndex].description;
+    expense[expenseIndex].amount = amount
+      ? amount
+      : expense[expenseIndex].amount;
+    expense[expenseIndex].categoryId = categoryId
+      ? categoryId
+      : expense[expenseIndex].categoryId;
 
-    writeFile(data);
+    writeFile({ expense: [...expense], category: [...category] });
 
     console.log(`Expense updated successfully (ID: ${id})`);
   } catch (error) {
@@ -143,31 +180,56 @@ const deleteExpense = (id) => {
   }
 };
 
-const listExpense = () => {
+const listExpense = (type) => {
   try {
-    const data = readFile();
+    const { expense, category } = readFile();
 
-    if (data.length == 0) {
-      console.log("No expense(s) available.");
-      return;
+    if (type == "expense") {
+      if (expense.length == 0) {
+        console.log("No expense(s) available.");
+        return;
+      }
+
+      const categoriesMap = category.reduce((acc, cat) => {
+        acc[cat.id] = cat.name;
+        return acc;
+      }, {});
+
+      console.log("ID      Date   Description    Amount     Category");
+      console.log("─────────────────────────────────────────────────");
+
+      expense.forEach((expense) => {
+        console.log(
+          `${expense.id.toString().padEnd(3)}  ${
+            expense.createdAt
+          }  ${expense.description.padEnd(12)}  $${expense.amount}    ${
+            categoriesMap[expense.categoryId]
+          }`
+        );
+      });
+    } else {
+      if (category.length == 0) {
+        console.log("No categories available.");
+        return;
+      }
+
+      console.log("ID      Date   Name");
+      console.log("───────────────────");
+
+      category.forEach((category) => {
+        console.log(
+          `${category.id.toString().padEnd(3)}  ${category.createdAt}  ${
+            category.name
+          }`
+        );
+      });
     }
-
-    console.log("ID      Date   Description    Amount");
-    console.log("────────────────────────────────────");
-
-    data.forEach((expense) => {
-      console.log(
-        `${expense.id.toString().padEnd(3)}  ${
-          expense.createdAt
-        }  ${expense.description.padEnd(12)}  $${expense.amount}`
-      );
-    });
   } catch (error) {
-    console.error(`Error Listing Expense(s): ${error.message}`);
+    console.error(`Error Listing ${type}: ${error.message}`);
   }
 };
 
-const summary = (month = "") => {
+const summary = (month = "", categoryId = "") => {
   try {
     if (month) {
       month = Number(month);
@@ -178,31 +240,189 @@ const summary = (month = "") => {
       }
     }
 
-    const data = readFile();
-    if (data.length == 0) {
-      console.log(
-        `Total expenses ${month ? `for ${MONTHS[month - 1]}` : ""}: $0`
+    const { expense, category } = readFile();
+
+    const categoriesMap = category.reduce((acc, cat) => {
+      acc[cat.id] = cat.name;
+      return acc;
+    }, {});
+
+    if (categoryId) {
+      categoryId = Number(categoryId);
+      if (isNaN(categoryId) || categoryId < 0) {
+        throw new Error(
+          "Invalid category ID, please provide a valid numeric category ID."
+        );
+      }
+
+      const categoryIndex = category.findIndex(
+        (category) => category.id === categoryId
       );
+
+      if (categoryIndex == -1)
+        throw new Error(`No category found with ID = ${categoryId}.`);
+    }
+
+    if (expense.length == 0) {
+      console.log(`Total expenses: $0`);
       return;
     }
 
-    if (!month) {
-      const finalSum = data.reduce((acc, curr) => acc + curr.amount, 0);
+    if (!month && !categoryId) {
+      const finalSum = expense.reduce((acc, curr) => acc + curr.amount, 0);
       console.log(`Total expenses: $${finalSum}`);
       return;
+    } else if (month && !categoryId) {
+      const finalSum = expense
+        .filter(
+          (expense) => new Date(expense.createdAt).getMonth() + 1 === month
+        )
+        .filter(
+          (expense) =>
+            new Date(expense.createdAt).getFullYear() ===
+            new Date().getFullYear()
+        )
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+      console.log(`Total expenses for ${MONTHS[month - 1]}: $${finalSum}`);
+      return;
+    } else if (categoryId && !month) {
+      const finalSum = expense
+        .filter((expense) => expense.categoryId === categoryId)
+        .reduce((acc, curr) => acc + curr.amount, 0);
+      console.log(
+        `Total expenses for category ( ${categoriesMap[categoryId]} ): $${finalSum}`
+      );
+      return;
+    } else {
+      const finalSum = expense
+        .filter((expense) => expense.categoryId === categoryId)
+        .filter(
+          (expense) => new Date(expense.createdAt).getMonth() + 1 === month
+        )
+        .filter(
+          (expense) =>
+            new Date(expense.createdAt).getFullYear() ===
+            new Date().getFullYear()
+        )
+        .reduce((acc, curr) => acc + curr.amount, 0);
+
+      console.log(
+        `Total expenses for category ( ${categoriesMap[categoryId]} ) for ${
+          MONTHS[month - 1]
+        }: $${finalSum}`
+      );
     }
-
-    const finalSum = data
-      .filter((expense) => new Date(expense.createdAt).getMonth() + 1 === month)
-      .filter(
-        (expense) =>
-          new Date(expense.createdAt).getFullYear() === new Date().getFullYear()
-      )
-      .reduce((acc, curr) => acc + curr.amount, 0);
-
-    console.log(`Total expenses for ${MONTHS[month - 1]}: $${finalSum}`);
   } catch (error) {
     console.error(`Error Listing Summary: ${error.message}`);
+  }
+};
+
+const createCategory = (name) => {
+  try {
+    name = name.trim();
+    if (!name) {
+      throw new Error("Name of category cannot be empty.");
+    }
+
+    const { expense, category } = readFile();
+
+    const categoryIndex = category.findIndex(
+      (category) => category.name === name
+    );
+
+    if (categoryIndex !== -1) throw new Error("Category already exist");
+
+    const now = new Date();
+
+    const formattedDate =
+      now.getFullYear() +
+      "-" +
+      String(now.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(now.getDate()).padStart(2, "0");
+
+    const categoryData = {
+      id:
+        category.length === 0
+          ? 1
+          : Math.max(...category.map((data) => data.id)) + 1,
+      name: name,
+      createdAt: formattedDate,
+    };
+
+    writeFile({ expense: [...expense], category: [...category, categoryData] });
+
+    console.log(`Category added successfully (ID: ${categoryData.id})`);
+  } catch (error) {
+    console.error(`Error adding category: ${error.message}`);
+  }
+};
+
+const editCategory = (id, name) => {
+  try {
+    id = Number(id);
+    if (!id || isNaN(id) || id < 0) {
+      throw new Error(
+        "Invalid ID, please provide a valid positive numeric ID."
+      );
+    }
+
+    name = name.trim();
+    if (!name) {
+      throw new Error("Name of category cannot be empty.");
+    }
+
+    const { expense, category } = readFile();
+
+    const categoryId = category.findIndex((category) => category.id === id);
+
+    if (categoryId === -1) throw new Error("Category does not exist.");
+
+    const categoryName = category.findIndex(
+      (category) => category.name === name
+    );
+
+    if (categoryName !== -1) throw new Error("Category already exist");
+
+    category[categoryId].name = name;
+
+    writeFile({ expense: [...expense], category: [...category] });
+
+    console.log(`Category updated successfully (ID: ${id})`);
+  } catch (error) {
+    console.error(`Error updating category: ${error.message}`);
+  }
+};
+
+const deleteCategory = (id) => {
+  try {
+    id = Number(id);
+    if (!id || isNaN(id) || id < 0) {
+      throw new Error(
+        "Invalid ID, please provide a valid positive numeric ID."
+      );
+    }
+
+    const { expense, category } = readFile();
+
+    const updatedCategory = category.filter((category) => category.id !== id);
+
+    if (category.length === updatedCategory.length)
+      throw new Error("Category does not exist.");
+
+    const categoryLink = expense.findIndex(
+      (expense) => expense.categoryId === id
+    );
+
+    if (categoryLink !== -1)
+      throw new Error("Category is linked to one or more expense(s).");
+
+    writeFile({ expense: [...expense], category: [...updatedCategory] });
+
+    console.log(`Category deleted successfully (ID: ${id})`);
+  } catch (error) {
+    console.error(`Error deleting category: ${error.message}`);
   }
 };
 
@@ -210,20 +430,29 @@ program
   .command("add")
   .requiredOption("--description <string>", "Expense description")
   .requiredOption("--amount <number>", "Expense amount")
-  .action((options) => addExpense(options.description, options.amount));
+  .requiredOption("--category <number>", "Category ID")
+  .action((options) =>
+    addExpense(options.description, options.amount, options.category)
+  );
 
 program
   .command("update")
   .requiredOption("--id <number>", "Expense ID")
   .option("--description <string>", "Expense description")
   .option("--amount <number>", "Expense amount")
+  .option("--category <number>", "Category ID")
   .action((options) => {
     try {
-      if (!options.description && !options.amount)
+      if (!options.description && !options.amount && !options.category)
         throw new Error(
-          "At least one of --description or --amount is required"
+          "At least one of --description or --amount or --category is required"
         );
-      updateExpense(options.id, options.description, options.amount);
+      updateExpense(
+        options.id,
+        options.description,
+        options.amount,
+        options.category
+      );
     } catch (error) {
       console.error(`Error updating expense: ${error.message}`);
     }
@@ -234,17 +463,43 @@ program
   .requiredOption("--id <number>", "Expense ID")
   .action((options) => deleteExpense(options.id));
 
-program.command("list").action(() => listExpense());
+program
+  .command("list")
+  .argument("<type>", "list of category or expense")
+  .action((type) => {
+    if (!["expense", "category"].includes(type.toLowerCase())) {
+      console.error("Error: Argument must be 'expense' or 'category'.");
+      process.exit(1);
+    }
+    listExpense(type);
+  });
 
 program
   .command("summary")
-  .option("--month <string>", "Month to view summary")
+  .option("--month <string>", "Summary month")
+  .option("--category <number>", "Category ID")
   .action((options) => {
-    if (!options.month) {
+    if (!options.month && !options.category) {
       summary();
       return;
     }
-    summary(options.month);
+    summary(options.month, options.category);
   });
+
+program
+  .command("create-category")
+  .requiredOption("--name <string>", "Category name")
+  .action((options) => createCategory(options.name));
+
+program
+  .command("edit-category")
+  .requiredOption("--id <number>", "Category ID")
+  .requiredOption("--name <string>", "Category name")
+  .action((options) => editCategory(options.id, options.name));
+
+program
+  .command("delete-category")
+  .requiredOption("--id <number>", "Category ID")
+  .action((options) => deleteCategory(options.id));
 
 program.parse();
